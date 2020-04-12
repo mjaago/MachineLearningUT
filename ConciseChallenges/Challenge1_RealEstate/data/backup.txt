@@ -1,0 +1,79 @@
+import xml.etree.ElementTree as ET
+
+
+administrative_entities = ['küla', 'alevik', 'vald', 'linn', 'maakond', 'linnaosa', 'alev']
+
+def getCountyMods(original):
+    county_mods = []
+    original = original.lower()
+    county_mods.append(original.lower())
+    county_split_ws = original.split()
+    county_split_slash = original.split('/')
+    county_split_dash = original.split('-')
+    
+    if original.endswith('maakond'):
+        county_mods.append(original.replace(' maakond', 'maa'))
+        
+    if county_split_ws[-1] in administrative_entities:
+        county_mods.append(' '.join(county_split_ws[:-1]))
+    
+    if len(county_split_slash) > 1:
+        county_mods.extend(county_split_slash)
+    
+    if len(county_split_dash) > 1:
+        county_mods.extend(county_split_dash)
+        
+    return county_mods
+
+def parseChildrenToDict(root_item):
+    child_items = root_item.findall('Item')
+    label = root_item.find('Label/LabelText').text.lower()
+    child_objects = getCountyMods(label)
+    
+    return_obj = {'name' : label, 'subdivisions': child_objects}
+    if len(child_items) == 0:
+        return return_obj
+    
+    for child in child_items:
+        return_obj['subdivisions'].append(parseChildrenToDict(child))
+        
+    return return_obj
+
+def parseChildrenToList(root_item, subdivision_list):
+    child_items = root_item.findall('Item')
+    label = root_item.find('Label/LabelText').text.lower()
+    if len(child_items) == 0:
+        return getCountyMods(label)
+    
+    for child in child_items:
+        subdivision_list.extend(parseChildrenToList(child, subdivision_list))
+        
+    return getCountyMods(label)
+
+def getCountyDivs(root):
+    county_div_list = {}
+    for el in root.findall('./Classification/Item'):
+        label = el.find('Label/LabelText').text.lower()
+        county_subdivs = getCountyMods(label)
+        parseChildrenToList(el, county_subdivs)
+        county_div_list[label] = county_subdivs
+    return county_div_list
+
+def getAllDivisions(root):
+    administrative_divs = []
+    for el in root.findall('./Classification/Item'):
+        label = el.find('Label/LabelText').text.lower()
+        administrative_divs.extend(getCountyMods(label))
+        parseChildrenToList(el, administrative_divs)
+    return administrative_divs
+
+
+tree = ET.parse('EHAK2019v8.xml')
+root = tree.getroot()
+
+train_data.groupby('Maakond').count()
+
+for county in train_data['Maakond'].str.lower().unique():
+    includes = any(mod in administrative_divs for mod in getCountyMods(county))
+    if not includes:
+        print(county)
